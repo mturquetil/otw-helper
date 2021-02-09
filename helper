@@ -1,0 +1,56 @@
+#!/bin/sh
+
+WD="$(dirname "$(readlink -f "$0")")"
+GAME=$1
+LEVEL=$2
+CONF=$WD/games.conf
+PASSWORD_FILE=$WD/games/$GAME
+
+function get_config {
+	while IFS=" " read -r name config;
+	do
+		if [ "$name" = "$1" ]; then
+			echo $config
+			break
+		fi
+	done < $CONF
+}
+
+function get_password {
+	while IFS=" " read -r user password;
+	do
+		if [ "$user" = "$1" ]; then
+			echo $password
+			break
+		fi
+	done < $PASSWORD_FILE
+}
+
+if [ -f "$PASSWORD_FILE" ]; then
+	config=$(get_config $GAME)
+
+	protocol=$(echo $config | cut -d" " -f 1)
+	host=$(echo $config | cut -d" " -f 2)
+	port=$(echo $config | cut -d" " -f 3)
+
+	user=$GAME$LEVEL
+	password=$(get_password $user)
+
+	if [ -z "$password" ]; then
+		echo "Password not found for this level" >&2 && exit 1
+	fi
+
+	if [ "$protocol" = "ssh" ]; then
+		sshpass -p $password ssh -qp $port $user@$host
+	elif [ "$protocol" = "http" ]; then
+		echo $password | xclip -selection clipboard
+
+		if [ -v BROWSER ]; then
+			`$BROWSER "http://$user:$password@$user.$host" &> /dev/null &`
+		fi
+	fi
+else
+	echo "Error: Password file doesnt exists" >&2
+fi
+
+
